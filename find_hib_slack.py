@@ -8,6 +8,7 @@ http://stoned-vienna.com/downloads/Hibernation%20File%20Attack/Hibernation%20Fil
 http://stoned-vienna.com/html/index.php?page=hibernation-file-attack
 http://digital-forensics.sans.org/blog/2014/07/01/hibernation-slack-unallocated-data-from-the-deep-past
 
+OS dependant
 struct MEMORY_TABLE
 {
     DWORD PointerSystemTable;
@@ -15,6 +16,14 @@ struct MEMORY_TABLE
     DWORD CheckSum;
     UINT32 EntryCount;
     MEMORY_TABLE_ENTRY MemoryTableEntries[EntryCount];
+};
+
+struct MEMORY_TABLE_ENTRY
+{
+    UINT32 PageCompressedData;
+    UINT32 PhysicalStartPage;
+    UINT32 PhysicalEndPage;
+    DWORD CheckSum;
 };
 
 struct IMAGE_XPRESS_HEADER
@@ -34,7 +43,7 @@ from collections import namedtuple
 
 XPRESS_SIG = "\x81\x81" + "xpress"
 PAGE_SIZE = 4096
-hfile = None
+VERBOSE = False
 
 def roundit(num, rnum):
     """
@@ -62,15 +71,12 @@ def verify_memorytable_offset(offset):
 def find_memorytable_nexttable_offset(data):
     """
         Dynamically find the NextTablePage pointer
-        Verification based on pointer verify function
+        Verification based on verify_memorytable_offset function
     """
     for i in range(len(data)):
         toffset = unpack('<I',data[i:(i+4)])[0]*PAGE_SIZE
         if verify_memorytable_offset(toffset):
             return i
-
-def memorytable_entries(data):
-    print data[:128].encode('hex')
     
 def xpressblock_size(fmm,offset):
     fmm.seek(offset)
@@ -79,7 +85,7 @@ def xpressblock_size(fmm,offset):
     fmm.read(1)
     xsize = roundit(((unpack('<I',fmm.read(4))[0] / 4) + 1),8)
     fmm.seek(offset) 
-    # sig8 + 1 + size4 + 19   
+    # sig8 + 1 + size4 + 19
     return (32+xsize)
                                   
 if __name__ == "__main__":
@@ -94,70 +100,56 @@ if __name__ == "__main__":
     
     MEMTABLE_OFFSET = None
     firstxpressblock = fmm.find(XPRESS_SIG)
-    print hex(firstxpressblock)
+    print "Found Xpress block @ 0x%x" % firstxpressblock
     firstmemtableoffset = firstxpressblock - PAGE_SIZE
-    print hex(firstmemtableoffset)
+    print "Corresponding MemoryTable @ 0x%x" % firstmemtableoffset
     fmm.seek(firstmemtableoffset)
     firstmemtable = fmm.read(PAGE_SIZE)
-    print len(firstmemtable)
     MEMTABLE_OFFSET = find_memorytable_nexttable_offset(firstmemtable)
-    print MEMTABLE_OFFSET
+    print "MemoryTable.NextTablePointer offset %d" % MEMTABLE_OFFSET
     
     nexttable = firstmemtableoffset
     while True:
         fmm.seek(nexttable)
+        fmm.seek(MEMTABLE_OFFSET,1)
         ntdata = fmm.read(4)
         noff = unpack('<I',ntdata)[0]*PAGE_SIZE
-        print hex(noff)
+        if VERBOSE:
+            print "MemoryTable @ 0x%x" % noff
         if not verify_memorytable_offset(noff):
             break
         nexttable = noff
     
     lasttable = nexttable
     
-    print hex(lasttable)
+    print "Last MemoryTable @ 0x%x" % lasttable
     fmm.seek(lasttable+PAGE_SIZE)
     nxpress = fmm.tell()
-    while True:    
-        #fmm.seek(nxpress)    
-        #fmm.read(len(XPRESS_SIG)+1)        
-        #xsize = roundit(((unpack('<I',fmm.read(4))[0] / 4) + 1),8)
-        #fmm.seek(nxpress)
-        #fmm.seek(xpressblock_size(xsize),1)
-        #print xsize
-        #fmm.read(19)
-        #fmm.seek(xsize,1)
+    while True:
         xsize = xpressblock_size(fmm,nxpress)
         fmm.seek(xsize,1)
         xh = fmm.read(8)
         if xh != XPRESS_SIG:
-            print "xsize"
-            print xsize
             break
-        print xh 
         fmm.seek(-8,1)
         nxpress = fmm.tell()
-    print "done"
-    print nxpress
-    print "slack start"
-    #fmm.seek(nxpress)
-    fmm.seek(nxpress-PAGE_SIZE)
-    memorytable_entries(fmm.read(PAGE_SIZE))
-    #fmm.seek(xpressblock_size(fmm,nxpress),1)
-    #print fmm.tell()
-    #print "file size"
-    #print fsize
+        if VERBOSE:
+            print "Xpress block @ 0x%x" % nxpress        
+    print "Last Xpress block @ 0x%x" % nxpress
+    fmm.seek(nxpress)
+    fmm.seek(xpressblock_size(fmm,nxpress),1)
+    slackstart = fmm.tell()
+    print "Start of slack space @ %d" % slackstart
+    print "Total file size %d" % fsize
+    print "Slackspace size %d megs" % ((fsize - slackstart) / 1024 / 1024)
 
-    #while True:
-    #    bla = fmm.find(XPRESS_SIG)
-    #    fmm.seek(bla)
-    #    print fmm.read(8)
-
-    print fmm.seek(156205056+32)
-    print fmm.read(8)    
-        
     
-        
+    bla = fmm.find(XPRESS_SIG)
+    fmm.seek(bla-PAGE_SIZE)
+    print verify_memorytable_offset(fmm.tell())
+    print hex(unpack('<I',fmm.read(4))[0]*PAGE_SIZE)   
+    print hex(unpack('<I',fmm.read(4))[0]*PAGE_SIZE)
+    print hex(unpack('<I',fmm.read(4))[0]*PAGE_SIZE)    
     fmm.close()
     f.close()
     
