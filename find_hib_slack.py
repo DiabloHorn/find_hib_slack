@@ -7,32 +7,6 @@ http://sandman.msuiche.net/docs/SandMan_Project.pdf
 http://stoned-vienna.com/downloads/Hibernation%20File%20Attack/Hibernation%20File%20Format.pdf
 http://stoned-vienna.com/html/index.php?page=hibernation-file-attack
 http://digital-forensics.sans.org/blog/2014/07/01/hibernation-slack-unallocated-data-from-the-deep-past
-
-OS dependant
-struct MEMORY_TABLE
-{
-    DWORD PointerSystemTable;
-    UINT32 NextTablePage; #point to next memory table
-    DWORD CheckSum;
-    UINT32 EntryCount;
-    MEMORY_TABLE_ENTRY MemoryTableEntries[EntryCount];
-};
-
-struct MEMORY_TABLE_ENTRY
-{
-    UINT32 PageCompressedData;
-    UINT32 PhysicalStartPage;
-    UINT32 PhysicalEndPage;
-    DWORD CheckSum;
-};
-
-struct IMAGE_XPRESS_HEADER
-{
-    CHAR Signature[8] = 81h, 81h, "xpress";
-    BYTE UncompressedPages = 15;
-    UINT32 CompressedSize;
-    BYTE Reserved[19] = 0;
-};
 """
 
 import sys
@@ -43,7 +17,7 @@ from collections import namedtuple
 
 XPRESS_SIG = "\x81\x81" + "xpress"
 PAGE_SIZE = 4096
-VERBOSE = True
+VERBOSE = False
 
 def roundit(num, rnum):
     """
@@ -79,6 +53,9 @@ def find_memorytable_nexttable_offset(data):
             return i
     
 def xpressblock_size(fmm,offset):
+    """
+        Get the xpress block size
+    """
     fmm.seek(offset)
     if fmm.read(8) != XPRESS_SIG:
         return None

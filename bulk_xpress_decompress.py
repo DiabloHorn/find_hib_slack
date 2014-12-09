@@ -31,9 +31,10 @@ def xpressblock_size(fmm,offset=0):
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
+        print sys.argv[0] + " <hiberfil.sys> [start_offset]"
         sys.exit()
     
-    
+
     hibfile = sys.argv[1]
     hiboffset = 0
     slackfile = './decompressed.slack'
@@ -45,15 +46,15 @@ if __name__ == "__main__":
     fmm = mmap.mmap(f.fileno(),0)
     fmm.seek(hiboffset)
     print "Advancing to offset %d" % hiboffset
-    while True:
-        xoff = fmm.find(XPRESS_SIG)
-        xsize = xpressblock_size(fmm,xoff)
-        print "Xpress block size: %d" % xsize         
-        #fmm.read(xsize)
-        fo.write(fmm.read(xsize)[32:])
-        #sys.exit()
-    fo.close()
-    fmm.close()
-    f.close()
+    try:
+        while True:
+            xoff = fmm.find(XPRESS_SIG)
+            xsize = xpressblock_size(fmm,xoff)
+            print "Xpress block @ 0x%x size: %d" % (xoff, xsize)
+            fo.write(fmm.read(xsize)[32:])
+    except:
+        fo.close()
+        fmm.close()
+        f.close()
     
 
