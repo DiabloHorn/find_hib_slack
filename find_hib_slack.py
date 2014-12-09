@@ -43,7 +43,7 @@ from collections import namedtuple
 
 XPRESS_SIG = "\x81\x81" + "xpress"
 PAGE_SIZE = 4096
-VERBOSE = False
+VERBOSE = True
 
 def roundit(num, rnum):
     """
@@ -132,24 +132,16 @@ if __name__ == "__main__":
         if xh != XPRESS_SIG:
             break
         fmm.seek(-8,1)
-        nxpress = fmm.tell()
         if VERBOSE:
-            print "Xpress block @ 0x%x" % nxpress        
+            print "Xpress block @ 0x%x" % nxpress         
+        nxpress = fmm.tell()       
     print "Last Xpress block @ 0x%x" % nxpress
     fmm.seek(nxpress)
     fmm.seek(xpressblock_size(fmm,nxpress),1)
     slackstart = fmm.tell()
     print "Start of slack space @ %d" % slackstart
     print "Total file size %d" % fsize
-    print "Slackspace size %d megs" % ((fsize - slackstart) / 1024 / 1024)
-
-    
-    bla = fmm.find(XPRESS_SIG)
-    fmm.seek(bla-PAGE_SIZE)
-    print verify_memorytable_offset(fmm.tell())
-    print hex(unpack('<I',fmm.read(4))[0]*PAGE_SIZE)   
-    print hex(unpack('<I',fmm.read(4))[0]*PAGE_SIZE)
-    print hex(unpack('<I',fmm.read(4))[0]*PAGE_SIZE)    
+    print "Slackspace size %d megs" % ((fsize - slackstart) / 1024 / 1024)   
     fmm.close()
     f.close()
     
